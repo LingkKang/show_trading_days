@@ -1,7 +1,7 @@
-import csv
 from enum import Enum
 
 import pandas as pd
+from ics import Event, Calendar
 
 date_arr = pd.date_range(start="2024-01-01", end="2024-12-31").tolist()
 
@@ -18,34 +18,54 @@ class TradingDayInfo:
         self.HKG_trading_info = trading_info
         self.USA_trading_info = trading_info
 
-    def list_repr(self) -> list[str]:
-        lis = []
+    def repr_events(self, date: pd.Timestamp) -> list[Event]:
+        lis: list[Event] = []
+        begin_date = date.strftime("%Y-%m-%d %X")
+
+        e = Event()
         if self.CHN_trading_info == Trading.Open:
-            lis.append("CHN trading day")
+            e.name = "CHN trading day"
+            e.begin = begin_date
+            e.make_all_day()
+            lis.append(e)
         elif self.CHN_trading_info == Trading.Close:
             pass
         elif self.CHN_trading_info == Trading.EarlyClose:
             raise TypeError("CHN do not have early close")
 
+        e = Event()
         if self.HKG_trading_info == Trading.Open:
-            lis.append("HKG trading day")
+            e.name = "HKG trading day"
+            e.begin = begin_date
+            e.make_all_day()
+            lis.append(e)
         elif self.HKG_trading_info == Trading.Close:
             pass
         elif self.HKG_trading_info == Trading.EarlyClose:
-            lis.append("HKG trading day w/ early close")
+            e.name = "HKG trading day w/ early close"
+            e.begin = begin_date
+            e.make_all_day()
+            lis.append(e)
 
+        e = Event()
         if self.USA_trading_info == Trading.Open:
-            lis.append("USA trading day")
+            e.name = "USA trading day"
+            e.begin = begin_date
+            e.make_all_day()
+            lis.append(e)
         elif self.USA_trading_info == Trading.Close:
             pass
         elif self.USA_trading_info == Trading.EarlyClose:
-            lis.append("USA trading day w/ early close")
+            e.name = "USA trading day w/ early close"
+            e.begin = begin_date
+            e.make_all_day()
+            lis.append(e)
 
         return lis
 
 
 # Initialize trading day info
-trading_day_info = {}
+trading_day_info: dict[pd.Timestamp, TradingDayInfo] = {}
 for date in date_arr:
     if date.day_of_week < 5:
         # day of week starts from 0 (mon)
@@ -162,15 +182,14 @@ for date in date_arr:
     if date in chn_close_days:
         trading_day_info[date].CHN_trading_info = Trading.Close
 
-# ======== Write to CSV ========
-with open("2024_trading_days.csv", "w", encoding="UTF-8", newline="") as f:
-    csv_writer = csv.writer(
-        f, delimiter=",", quotechar='"', quoting=csv.QUOTE_NONNUMERIC
-    )
-    csv_writer.writerow(["Subject", "Start Date", "All Day Event"])
-    for date in date_arr:
-        info_list = trading_day_info[date].list_repr()
-        for info in info_list:
-            csv_writer.writerow([info, date.strftime("%m/%d/%Y"), "True"])
+# ======== Write to ICS ========
+c = Calendar()
+
+for date in date_arr:
+    for e in trading_day_info[date].repr_events(date):
+        c.events.add(e)
+
+with open("2024_trading_days.ics", "w", encoding="UTF-8", newline="") as f:
+    f.writelines(c.serialize_iter())
 
 print("Done")
